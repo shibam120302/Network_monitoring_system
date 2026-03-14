@@ -43,6 +43,14 @@ email-validator==2.1.0
 httpx==0.26.0
 aiohttp==3.9.3
 
+# Kafka (streaming)
+kafka-python==2.0.2
+
+# OpenTelemetry (optional)
+opentelemetry-api==1.22.0
+opentelemetry-sdk==1.22.0
+opentelemetry-instrumentation-fastapi==0.43b0
+
 # Utils
 python-dotenv==1.0.1
 python-multipart==0.0.9

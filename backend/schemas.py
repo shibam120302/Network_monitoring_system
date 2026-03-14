@@ -169,3 +169,42 @@ class SimulateResponse(BaseModel):
     success: bool
     message: str
     simulation_id: Optional[str] = None
+
+
+# --- Feature 1: Predictions ---
+class PredictionResponse(BaseModel):
+    node_id: str
+    failure_probability: float
+    predicted_issue: Optional[str] = None
+
+
+# --- Feature 2: Root cause ---
+class RootCauseResponse(BaseModel):
+    incident_id: str
+    root_cause: str
+    affected_nodes: List[str]
+    analysis_time: Optional[str] = None
+
+
+# --- Feature 3: Correlated incidents ---
+class CorrelatedGroupResponse(BaseModel):
+    group_id: int
+    root_cause_summary: Optional[str] = None
+    created_at: Optional[str] = None
+    incident_ids: List[str]
+    affected_nodes: List[str]
+
+
+# --- Feature 5: Chaos ---
+class ChaosSimulateRequest(BaseModel):
+    node_id: str
+    failure_type: str  # packet_loss, high_latency, cpu_spike, link_failure, node_shutdown
+    duration_seconds: Optional[int] = 120
+
+
+class ChaosSimulateResponse(BaseModel):
+    success: bool
+    run_id: Optional[int] = None
+    detection_verified: Optional[bool] = None
+    remediation_verified: Optional[bool] = None
+    message: str

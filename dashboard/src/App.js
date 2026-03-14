@@ -8,6 +8,9 @@ import Reports from './pages/Reports';
 import Chat from './pages/Chat';
 import SLA from './pages/SLA';
 import Simulate from './pages/Simulate';
+import Predictions from './pages/Predictions';
+import Correlated from './pages/Correlated';
+import Chaos from './pages/Chaos';
 import './App.css';
 
 const API_BASE = process.env.REACT_APP_API_URL || '';
@@ -21,11 +24,14 @@ function App() {
           <NavLink to="/" end>Dashboard</NavLink>
           <NavLink to="/nodes">Nodes</NavLink>
           <NavLink to="/incidents">Incidents</NavLink>
+          <NavLink to="/predictions">Predictions</NavLink>
+          <NavLink to="/correlated">Correlated</NavLink>
           <NavLink to="/topology">Topology</NavLink>
           <NavLink to="/reports">Reports</NavLink>
           <NavLink to="/sla">SLA</NavLink>
           <NavLink to="/chat">AI Chat</NavLink>
           <NavLink to="/simulate">Simulate</NavLink>
+          <NavLink to="/chaos">Chaos</NavLink>
         </div>
       </nav>
       <main className="main">
@@ -33,11 +39,15 @@ function App() {
           <Route path="/" element={<Dashboard apiBase={API_BASE} />} />
           <Route path="/nodes" element={<Nodes apiBase={API_BASE} />} />
           <Route path="/incidents" element={<Incidents apiBase={API_BASE} />} />
+          <Route path="/incidents/:id" element={<Incidents apiBase={API_BASE} />} />
+          <Route path="/predictions" element={<Predictions apiBase={API_BASE} />} />
+          <Route path="/correlated" element={<Correlated apiBase={API_BASE} />} />
           <Route path="/topology" element={<Topology apiBase={API_BASE} />} />
           <Route path="/reports" element={<Reports apiBase={API_BASE} />} />
           <Route path="/sla" element={<SLA apiBase={API_BASE} />} />
           <Route path="/chat" element={<Chat apiBase={API_BASE} />} />
           <Route path="/simulate" element={<Simulate apiBase={API_BASE} />} />
+          <Route path="/chaos" element={<Chaos apiBase={API_BASE} />} />
         </Routes>
       </main>
     </HashRouter>

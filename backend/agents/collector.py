@@ -91,11 +91,17 @@ def collect_metrics(
 
 
 def send_metrics(api_base: str, payload: dict) -> bool:
-    """POST payload to central API /api/v1/metrics."""
+    """POST payload to central API /api/v1/metrics. If Kafka is configured, also produce to metrics topic."""
     url = f"{api_base.rstrip('/')}/api/v1/metrics"
     try:
         r = httpx.post(url, json=payload, timeout=10)
-        return r.status_code == 200
+        ok = r.status_code == 200
+        try:
+            from backend.stream_processing.kafka_producer import produce_metric
+            produce_metric(payload)
+        except Exception:
+            pass
+        return ok
     except Exception:
         return False
 

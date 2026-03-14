@@ -48,6 +48,14 @@ class Settings(BaseSettings):
     NETMIKO_TIMEOUT: int = 30
     NETMIKO_DEVICE_TYPE: str = "cisco_ios"
 
+    # Kafka (optional streaming)
+    KAFKA_BOOTSTRAP_SERVERS: str = ""
+    KAFKA_METRICS_TOPIC: str = "network-metrics"
+
+    # OpenTelemetry (optional)
+    OTEL_EXPORTER_OTLP_ENDPOINT: str = ""
+    OTEL_SERVICE_NAME: str = "network-monitoring-api"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

@@ -127,19 +127,25 @@ For 100+ nodes, run one process per node or use Celery to dispatch `collect_and_
 | GET | `/api/v1/nodes/{id}/metrics` | Metric history for a node |
 | GET | `/api/v1/incidents` | List incidents (optional filters) |
 | GET | `/api/v1/incidents/{id}` | Incident detail + timeline |
+| GET | `/api/v1/incidents/{id}/root-cause` | **Root cause analysis** for incident |
+| GET | `/api/v1/incidents/correlated` | **Correlated incident groups** |
 | GET | `/api/v1/topology` | Network topology (nodes + edges) |
 | GET | `/api/v1/reports/daily` | Daily AI report (generate or get) |
 | GET | `/api/v1/reports/daily/download` | Download daily report PDF |
 | GET | `/api/v1/sla` | SLA metrics (uptime %, MTTR, MTBF) |
+| GET | `/api/v1/predictions` | **ML failure predictions** (probability + predicted issue) |
 | POST | `/api/v1/ai/chat` | AI chat (questions about network) |
 | POST | `/api/v1/simulate/latency` | Simulate latency spike |
 | POST | `/api/v1/simulate/packet_loss` | Simulate packet loss |
 | POST | `/api/v1/simulate/link_failure` | Simulate link failure |
 | POST | `/api/v1/simulate/cpu_spike` | Simulate CPU spike |
+| POST | `/api/v1/chaos/simulate` | **Chaos engineering** (packet_loss, high_latency, cpu_spike, link_failure, node_shutdown) |
+| GET | `/api/v1/chaos/runs` | List chaos simulation runs |
 
 ## Features
 
-- **Distributed monitoring agents:** Ping, SNMP, Netmiko; metrics every 30s to central API.
+### Core
+- **Distributed monitoring agents:** Ping, SNMP, Netmiko; metrics every 30s to central API (REST or Kafka).
 - **Incident detection:** Rule-based (latency > 100ms, packet loss > 5%, CPU > 90%, interface down, node unreachable).
 - **Automated remediation:** Restart interface/service/agent via Netmiko (or simulated when no device).
 - **Email alerts:** SMTP on incident detection (configure SMTP_* in `.env`).
@@ -151,23 +157,37 @@ For 100+ nodes, run one process per node or use Celery to dispatch `collect_and_
 - **SLA metrics:** Uptime %, MTTR, MTBF over configurable period.
 - **Optional ML:** Isolation Forest for anomaly detection on metrics.
 
+### Advanced (production-level)
+
+- **Predictive failure detection (AI):** ML model (Isolation Forest / Random Forest) on latency, packet_loss, cpu, memory, bandwidth; predicts probability of node failure in 10–30 minutes and predicted cause. `GET /predictions`.
+- **Intelligent root cause analysis:** Uses topology graph, metric correlations, and neighboring node failures to infer root cause (e.g. congestion at upstream node). `GET /incidents/{id}/root-cause`.
+- **Event correlation engine:** Groups related alerts by time proximity, topology, and metric similarity into single incidents to reduce noise. Stored in DB. `GET /incidents/correlated`.
+- **Real-time metrics streaming (Kafka):** Optional pipeline: agents → Kafka topic → stream consumer → anomaly detection → PostgreSQL. Set `KAFKA_BOOTSTRAP_SERVERS` and optionally run Kafka consumer (Celery task or standalone).
+- **Chaos engineering simulator:** Inject failures (node_shutdown, packet_loss, high_latency, network_partition, cpu_spike), verify detection and remediation, log results. `POST /chaos/simulate`, `GET /chaos/runs`.
+- **Daily report extended:** AI report now includes predicted failures count, correlated incident groups, root cause summaries, and chaos simulation results (detection/remediation rate).
+- **OpenTelemetry:** Optional tracing when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
+
 ## Project Structure
 
 ```
 network-monitoring-system/
 ├── backend/
-│   ├── agents/          # Monitoring agent (collector)
-│   ├── monitoring_service/  # (integrated in main)
-│   ├── incident_engine/ # Rule-based + ML detection
+│   ├── agents/            # Monitoring agent (collector) + optional Kafka producer
+│   ├── incident_engine/   # Rule-based detection
 │   ├── remediation_engine/
-│   ├── alerts/          # SMTP
-│   ├── ai_agent/        # Chat
-│   ├── reporting_service/
-│   ├── simulation/
-│   ├── topology/
-│   ├── ml_anomaly/      # Isolation Forest
-│   ├── routers/         # FastAPI routes
-│   ├── tasks/           # Celery tasks
+│   ├── alerts/            # SMTP
+│   ├── ai_agent/          # Chat
+│   ├── reporting_service/ # Daily AI report (includes predictions, correlated, chaos)
+│   ├── simulation/        # Failure simulation
+│   ├── topology/          # NetworkX topology
+│   ├── ml_anomaly/        # Isolation Forest (legacy)
+│   ├── ml_prediction/     # Predictive failure detection (Isolation Forest / Random Forest)
+│   ├── root_cause_engine/ # Intelligent root cause analysis
+│   ├── event_correlation/ # Alert correlation (time, topology, metric similarity)
+│   ├── stream_processing/ # Kafka consumer + producer
+│   ├── chaos_engine/      # Chaos engineering simulator
+│   ├── routers/           # FastAPI routes
+│   ├── tasks/             # Celery tasks (monitoring, reports, stream_consumer)
 │   ├── config.py
 │   ├── main.py
 │   └── celery_app.py

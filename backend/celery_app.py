@@ -10,6 +10,7 @@ app = Celery(
     include=[
         "backend.tasks.monitoring",
         "backend.tasks.reports",
+        "backend.tasks.stream_consumer",
     ],
 )
 app.conf.update(

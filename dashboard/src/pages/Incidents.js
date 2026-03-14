@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { incidents, incident } from '../api';
+import { incidents, incident, incidentRootCause } from '../api';
 
 export default function Incidents({ apiBase }) {
   const { id } = useParams();
   const [list, setList] = useState([]);
   const [detail, setDetail] = useState(null);
+  const [rootCause, setRootCause] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,6 +23,13 @@ export default function Incidents({ apiBase }) {
       .catch(() => setDetail(null));
   }, [id]);
 
+  useEffect(() => {
+    if (!id) return;
+    incidentRootCause(id)
+      .then(setRootCause)
+      .catch(() => setRootCause(null));
+  }, [id]);
+
   if (loading) return <div className="page-title">Loading...</div>;
 
   return (
@@ -34,6 +42,15 @@ export default function Incidents({ apiBase }) {
           <p><strong>Issue:</strong> {detail.issue_type} · <strong>Severity:</strong> {detail.severity} · <strong>Status:</strong> {detail.status}</p>
           <p><strong>Time:</strong> {new Date(detail.timestamp).toLocaleString()}</p>
           {detail.resolved_at && <p><strong>Resolved:</strong> {new Date(detail.resolved_at).toLocaleString()}</p>}
+          {rootCause && (
+            <>
+              <h4>Root cause analysis</h4>
+              <p><strong>Root cause:</strong> {rootCause.root_cause}</p>
+              {rootCause.affected_nodes && rootCause.affected_nodes.length > 0 && (
+                <p><strong>Affected nodes:</strong> {rootCause.affected_nodes.join(', ')}</p>
+              )}
+            </>
+          )}
           <h4>Timeline</h4>
           <ul className="timeline">
             {detail.timeline && detail.timeline.map((e) => (

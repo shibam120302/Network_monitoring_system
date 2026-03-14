@@ -5,7 +5,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
-from database.models import Base, Node, Metric, Incident, IncidentTimelineEvent, RemediationLog, TopologyLink, DailyReport, SLAMetrics  # noqa: F401
+from database.models import (  # noqa: F401
+    Base, Node, Metric, Incident, IncidentTimelineEvent, RemediationLog,
+    TopologyLink, DailyReport, SLAMetrics, FailurePrediction,
+    IncidentCorrelationGroup, CorrelatedIncident, ChaosSimulationRun,
+)
 
 # Sync engine for Celery/agents
 def get_engine(database_url: str):

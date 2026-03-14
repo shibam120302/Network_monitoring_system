@@ -1,10 +1,18 @@
-"""Daily AI report generation and PDF export."""
+"""Daily AI report generation and PDF export. Includes predictions, correlated incidents, root cause, chaos results."""
 from datetime import datetime, timedelta
 from io import BytesIO
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_
+from sqlalchemy import and_, desc
 
-from database.models import Incident, Node, RemediationLog, DailyReport
+from database.models import (
+    Incident,
+    Node,
+    RemediationLog,
+    DailyReport,
+    FailurePrediction,
+    IncidentCorrelationGroup,
+    ChaosSimulationRun,
+)
 from backend.config import get_settings
 
 
@@ -53,6 +61,21 @@ def generate_daily_report(db: Session, for_date: datetime = None) -> DailyReport
         t = i.issue_type
         root_causes[t] = root_causes.get(t, 0) + 1
 
+    # Extended sections: predictions, correlated, root cause summaries, chaos results
+    since = start
+    predictions_high = db.query(FailurePrediction).filter(
+        FailurePrediction.computed_at >= since,
+        FailurePrediction.failure_probability >= 0.5,
+    ).count()
+    correlated_groups = db.query(IncidentCorrelationGroup).filter(
+        IncidentCorrelationGroup.created_at >= since,
+    ).count()
+    chaos_runs = db.query(ChaosSimulationRun).filter(
+        ChaosSimulationRun.started_at >= since,
+    ).all()
+    chaos_detected = sum(1 for r in chaos_runs if r.detection_verified)
+    chaos_remediated = sum(1 for r in chaos_runs if r.remediation_verified)
+
     ai_summary = _generate_ai_summary(
         total_incidents=total,
         affected_count=affected_count,
@@ -61,6 +84,11 @@ def generate_daily_report(db: Session, for_date: datetime = None) -> DailyReport
         remediation_success_rate=remediation_success_rate,
         root_causes=root_causes,
         health_score=health_score,
+        predictions_high=predictions_high,
+        correlated_groups=correlated_groups,
+        chaos_runs=len(chaos_runs),
+        chaos_detection_rate=(chaos_detected / len(chaos_runs) * 100) if chaos_runs else None,
+        chaos_remediation_rate=(chaos_remediated / len(chaos_runs) * 100) if chaos_runs else None,
     )
 
     report = DailyReport(
@@ -76,8 +104,20 @@ def generate_daily_report(db: Session, for_date: datetime = None) -> DailyReport
     db.add(report)
     db.flush()
 
-    # PDF
-    pdf_buffer = _generate_pdf(report, ai_summary, root_causes, avg_downtime, remediation_success_rate, health_score)
+    # PDF (with extended sections)
+    pdf_buffer = _generate_pdf(
+        report,
+        ai_summary,
+        root_causes,
+        avg_downtime,
+        remediation_success_rate,
+        health_score,
+        predictions_high=predictions_high,
+        correlated_groups=correlated_groups,
+        chaos_runs=len(chaos_runs),
+        chaos_detection_rate=(chaos_detected / len(chaos_runs) * 100) if chaos_runs else None,
+        chaos_remediation_rate=(chaos_remediated / len(chaos_runs) * 100) if chaos_runs else None,
+    )
     if pdf_buffer:
         import os
         reports_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "reports")
@@ -99,8 +139,13 @@ def _generate_ai_summary(
     remediation_success_rate: float | None,
     root_causes: dict,
     health_score: float,
+    predictions_high: int = 0,
+    correlated_groups: int = 0,
+    chaos_runs: int = 0,
+    chaos_detection_rate: float | None = None,
+    chaos_remediation_rate: float | None = None,
 ) -> str:
-    """Call OpenAI or local LLM to generate 1-page summary."""
+    """Call OpenAI or local LLM to generate 1-page summary including predictions, correlated incidents, chaos results."""
     settings = get_settings()
     prompt = f"""Generate a concise 1-paragraph network health report summary (2-4 sentences) for the last 24 hours.
 Total incidents: {total_incidents}
@@ -109,7 +154,10 @@ Average downtime (minutes): {avg_downtime_minutes}
 Remediation success rate (%): {remediation_success_rate}
 Root causes breakdown: {root_causes}
 Network health score (0-100): {health_score}
-Write in professional tone. Mention key figures and the most common issue."""
+Predicted high-risk nodes (failure probability >= 50%): {predictions_high}
+Correlated incident groups (alerts grouped): {correlated_groups}
+Chaos engineering runs: {chaos_runs}; detection rate: {chaos_detection_rate}%; remediation rate: {chaos_remediation_rate}%
+Write in professional tone. Mention key figures, the most common issue, and if relevant predicted failures or chaos test results."""
 
     if settings.OPENAI_API_KEY:
         try:
@@ -131,19 +179,38 @@ Write in professional tone. Mention key figures and the most common issue."""
 
     # Fallback template
     top_cause = max(root_causes, key=root_causes.get) if root_causes else "N/A"
+    extra = ""
+    if predictions_high:
+        extra += f" {predictions_high} node(s) had high failure probability. "
+    if correlated_groups:
+        extra += f" {correlated_groups} correlated incident groups were identified. "
+    if chaos_runs and chaos_detection_rate is not None:
+        extra += f" Chaos tests: {chaos_detection_rate:.0f}% detection, {chaos_remediation_rate or 0:.0f}% remediation. "
     return (
         f"During the last 24 hours the monitoring system detected {total_incidents} incidents across {total_nodes} nodes. "
         f"The most common issue was {top_cause}. "
         f"Automated remediation resolved {remediation_success_rate or 0:.0f}% of incidents without manual intervention. "
-        f"Network health score: {health_score:.0f}/100."
+        f"Network health score: {health_score:.0f}/100.{extra}"
     )
 
 
-def _generate_pdf(report, ai_summary: str, root_causes: dict, avg_downtime, remediation_success_rate, health_score) -> BytesIO | None:
-    """Generate PDF with reportlab."""
+def _generate_pdf(
+    report,
+    ai_summary: str,
+    root_causes: dict,
+    avg_downtime,
+    remediation_success_rate,
+    health_score,
+    predictions_high: int = 0,
+    correlated_groups: int = 0,
+    chaos_runs: int = 0,
+    chaos_detection_rate: float | None = None,
+    chaos_remediation_rate: float | None = None,
+) -> BytesIO | None:
+    """Generate PDF with reportlab including predictions, correlated, chaos results."""
     try:
         from reportlab.lib.pagesizes import letter
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.styles import getSampleStyleSheet
         from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
         from reportlab.lib import colors
         from reportlab.lib.units import inch
@@ -166,6 +233,11 @@ def _generate_pdf(report, ai_summary: str, root_causes: dict, avg_downtime, reme
             ["Avg Downtime (min)", f"{avg_downtime:.1f}" if avg_downtime else "N/A"],
             ["Remediation Success Rate (%)", f"{remediation_success_rate:.1f}" if remediation_success_rate else "N/A"],
             ["Network Health Score", f"{health_score:.0f}/100"],
+            ["High-Risk Predictions", str(predictions_high)],
+            ["Correlated Incident Groups", str(correlated_groups)],
+            ["Chaos Runs", str(chaos_runs)],
+            ["Chaos Detection Rate (%)", f"{chaos_detection_rate:.1f}" if chaos_detection_rate is not None else "N/A"],
+            ["Chaos Remediation Rate (%)", f"{chaos_remediation_rate:.1f}" if chaos_remediation_rate is not None else "N/A"],
         ]
         t = Table(data)
         t.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), colors.grey), ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke)]))

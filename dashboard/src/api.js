@@ -56,3 +56,32 @@ export function simulate(type, nodeId) {
     body: JSON.stringify({ node_id: nodeId }),
   });
 }
+
+export function predictions(recompute = false, horizonMinutes = 30) {
+  let q = `horizon_minutes=${horizonMinutes}`;
+  if (recompute) q += '&recompute=true';
+  return api(`/predictions?${q}`);
+}
+
+export function incidentRootCause(incidentId) {
+  return api(`/incidents/${incidentId}/root-cause`);
+}
+
+export function correlatedIncidents(runNow = false, hours = 24, limit = 50) {
+  let q = `limit=${limit}&hours=${hours}`;
+  if (runNow) q += '&run_now=true';
+  return api(`/incidents/correlated?${q}`);
+}
+
+export function chaosSimulate(nodeId, failureType, durationSeconds = 120) {
+  return api('/chaos/simulate', {
+    method: 'POST',
+    body: JSON.stringify({ node_id: nodeId, failure_type: failureType, duration_seconds: durationSeconds }),
+  });
+}
+
+export function chaosRuns(nodeId = null, limit = 50) {
+  let q = `limit=${limit}`;
+  if (nodeId) q += `&node_id=${encodeURIComponent(nodeId)}`;
+  return api(`/chaos/runs?${q}`);
+}

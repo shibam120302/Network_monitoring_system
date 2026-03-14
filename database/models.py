@@ -175,3 +175,55 @@ class SLAMetrics(BaseMixin):
     mttr_minutes = Column(Float, nullable=True)  # Mean Time To Recovery
     mtbf_minutes = Column(Float, nullable=True)  # Mean Time Between Failures
     incident_count = Column(Integer, default=0)
+
+
+# --- Feature 1: Predictive failure detection ---
+class FailurePrediction(BaseMixin):
+    __tablename__ = "failure_predictions"
+
+    node_id = Column(Integer, ForeignKey("nodes.id"), nullable=False, index=True)
+    failure_probability = Column(Float, nullable=False)  # 0.0 - 1.0
+    predicted_issue = Column(String(128), nullable=True)  # e.g. "cpu overload"
+    horizon_minutes = Column(Integer, default=30)
+    computed_at = Column(DateTime, nullable=False, index=True)
+    model_version = Column(String(64), nullable=True)
+
+    node = relationship("Node", backref="failure_predictions")
+
+
+# --- Feature 2 & 3: Event correlation ---
+class IncidentCorrelationGroup(BaseMixin):
+    __tablename__ = "incident_correlation_groups"
+
+    root_cause_summary = Column(String(512), nullable=True)  # e.g. "Network congestion in region-A"
+    created_at = Column(DateTime, nullable=False, index=True)
+    metadata_ = Column("metadata", JSONB, default=dict)  # time_proximity_sec, topology_region, etc.
+
+    members = relationship("CorrelatedIncident", back_populates="correlation_group", cascade="all, delete-orphan")
+
+
+class CorrelatedIncident(BaseMixin):
+    __tablename__ = "correlated_incidents"
+
+    correlation_group_id = Column(Integer, ForeignKey("incident_correlation_groups.id"), nullable=False, index=True)
+    incident_id = Column(Integer, ForeignKey("incidents.id"), nullable=False, index=True)
+
+    correlation_group = relationship("IncidentCorrelationGroup", back_populates="members")
+    incident = relationship("Incident", backref="correlation_memberships")
+
+
+# --- Feature 5: Chaos engineering ---
+class ChaosSimulationRun(BaseMixin):
+    __tablename__ = "chaos_simulation_runs"
+
+    node_id = Column(Integer, ForeignKey("nodes.id"), nullable=False, index=True)
+    failure_type = Column(String(64), nullable=False)  # node_shutdown, packet_loss, high_latency, network_partition, cpu_spike
+    started_at = Column(DateTime, nullable=False)
+    ended_at = Column(DateTime, nullable=True)
+    detection_verified = Column(Boolean, nullable=True)  # True if incident was detected
+    remediation_verified = Column(Boolean, nullable=True)  # True if remediation ran
+    incident_id = Column(Integer, ForeignKey("incidents.id"), nullable=True, index=True)
+    result_log = Column(JSONB, default=dict)  # details for analysis
+
+    node = relationship("Node", backref="chaos_runs")
+    incident = relationship("Incident", backref="chaos_runs")
