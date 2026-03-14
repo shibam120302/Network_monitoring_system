@@ -356,42 +356,34 @@ If steps 1–4 work, the core stack is running. Steps 5–10 confirm data, simul
 
 ---
 
-## 7. Troubleshooting
+---
 
-### API won’t start (Docker)
+## 8. Advanced Features Usage
 
-- **Check logs:** `docker-compose logs api`
-- **Database not ready:** Wait longer after `docker-compose up -d`, or run seed again after 1–2 minutes.
-- **Port 8000 in use:** Stop the other app using 8000, or change the API port in `docker-compose.yml` (e.g. `"8001:8000"`) and use `http://localhost:8001` for API and dashboard `REACT_APP_API_URL`.
+### Predictive Failure Detection
 
-### API won’t start (local)
+- View predictions in dashboard (Predictions page) or via API endpoint `/predictions`.
+- Predictions are generated automatically from real-time metrics.
 
-- **“ModuleNotFoundError”:** Ensure venv is activated and you ran `pip install -r requirements.txt`. Set `PYTHONPATH` to project root: `$env:PYTHONPATH = (Get-Location).Path`.
-- **Database connection error:** Check PostgreSQL is running, and that `DATABASE_URL` in `.env` matches your DB (user `monitor`, database `network_monitoring`, port 5432).
-- **Redis connection error:** Check Redis is running on port 6379; set `REDIS_URL` in `.env`.
+### Root Cause Analysis
 
-### Dashboard shows “Loading…” or empty lists
+- Results available in dashboard (Root Cause page) or via `/root_cause` endpoint.
+- Automated diagnosis runs on detected incidents.
 
-- API must be running and reachable. Open http://localhost:8000/health; if it fails, fix the API first.
-- If running dashboard with `npm start`, set `REACT_APP_API_URL=http://localhost:8000` so the UI calls the right host (or rely on `proxy` in `dashboard/package.json` when API is on same host).
-- Run the seed script so nodes and metrics exist: `python scripts/seed_nodes.py` (local) or `docker exec nm-api python scripts/seed_nodes.py` (Docker).
+### Event Correlation
 
-### Seed script fails
+- Correlated events shown in dashboard (Correlated page) and `/correlated` endpoint.
+- Links related events for actionable insights.
 
-- **“connection refused” / “could not connect”:** Start the API first, then run the seed script. For Docker, ensure the API container is healthy before running `docker exec nm-api python scripts/seed_nodes.py`.
-- **“role monitor does not exist”:** Create the PostgreSQL user and database as in [Step 1 of “Run locally”](#step-1-create-database-and-user-in-postgresql).
+### Streaming Pipeline
 
-### Docker build fails
+- Real-time metrics and anomalies processed via Kafka and shown in dashboard.
+- Streaming pipeline runs automatically when stack is up.
 
-- Ensure Docker Desktop is running and you have enough disk space.
-- From project root run: `cd docker` then `docker-compose build --no-cache` to see full build output.
+### Chaos Engineering Simulator
 
-### Port already in use
-
-- **5432:** Another PostgreSQL instance. Stop it or change the host port in `docker-compose.yml` (e.g. `"5433:5432"`).
-- **6379:** Another Redis. Stop it or change the port mapping.
-- **8000:** Another app. Use a different host port for the API (e.g. `"8001:8000"`) and set `REACT_APP_API_URL=http://localhost:8001` for the dashboard.
-- **3000:** Another React or Node app. Use another port: in `dashboard/package.json` you can set `"start": "PORT=3001 react-scripts start"` (or on Windows use `set PORT=3001 && npm start`).
+- Launch simulations from dashboard (Chaos page) or `/chaos` endpoint.
+- Inject faults to test system resilience and observe recovery.
 
 ---
 
